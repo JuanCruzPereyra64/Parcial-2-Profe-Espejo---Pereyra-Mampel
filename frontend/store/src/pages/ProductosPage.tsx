@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2, Trash2, UtensilsCrossed, Filter, Search, ChevronRight, Check } from 'lucide-react'
 import { Modal } from '../components/common/Modal'
@@ -28,6 +28,12 @@ export function ProductosPage() {
     categoria_id: 0, 
     ingrediente_ids: [] 
   })
+
+  const categoriasHoja = useMemo(() => {
+    if (!categorias) return []
+    const conHijos = new Set(categorias.filter(c => c.parent_id != null).map(c => c.parent_id!))
+    return categorias.filter(c => !conHijos.has(c.id))
+  }, [categorias])
 
   const { data: productosFiltrados } = useProductos(filtroCategoria)
   const listaBase = filtroCategoria !== undefined ? productosFiltrados : productos
@@ -232,7 +238,7 @@ export function ProductosPage() {
               <select required value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: Number(e.target.value) })}
                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none">
                 <option value={0} disabled>Seleccionar...</option>
-                {categorias?.map((c) => (
+                {categoriasHoja.map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>

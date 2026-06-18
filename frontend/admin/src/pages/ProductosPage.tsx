@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Edit2, Trash2, UtensilsCrossed, Filter, Search, ChevronRight, Check } from 'lucide-react'
+import { Plus, Edit2, Trash2, UtensilsCrossed, Filter, Search, ChevronRight, Check, Sparkles } from 'lucide-react'
+import { NumberInput } from '../components/common/NumberInput'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { Card } from '../components/common/Card'
 import { Skeleton } from '../components/common/Skeleton'
+import { Pagination } from '../components/common/Pagination'
 import { useProductos, useCreateProducto, useUpdateProducto, useDeleteProducto } from '../hooks/useProductos'
 import { useCategorias } from '../hooks/useCategorias'
 import { useIngredientes } from '../hooks/useIngredientes'
+import { usePagination } from '../hooks/usePagination'
 import type { Producto, ProductoCreate } from '../types'
 import { formatCurrency } from '../utils/format'
+
+const PAGE_SIZE = 10
 
 export function ProductosPage() {
   const { data: productos, isLoading, isError } = useProductos()
@@ -35,13 +40,37 @@ export function ProductosPage() {
   const [uploadMode, setUploadMode] = useState<'url' | 'file'>('file')
   const [uploadingImage, setUploadingImage] = useState(false)
 
+  const categoriasHoja = useMemo(() => {
+    if (!categorias) return []
+    const conHijos = new Set(categorias.filter(c => c.parent_id != null).map(c => c.parent_id!))
+    return categorias.filter(c => !conHijos.has(c.id))
+  }, [categorias])
+
+  const precioSugerido = useMemo(() => {
+    if (!todosIngredientes || form.ingredientes.length === 0) return null
+    let costo = 0
+    let sinPrecio = 0
+    for (const fi of form.ingredientes) {
+      const ing = todosIngredientes.find(i => i.id === fi.id)
+      if (ing?.precio_costo) {
+        costo += Number(ing.precio_costo) * Number(fi.cantidad_requerida)
+      } else {
+        sinPrecio++
+      }
+    }
+    if (costo === 0) return null
+    return { precio: Math.round(costo * 1.3 * 100) / 100, sinPrecio }
+  }, [form.ingredientes, todosIngredientes])
+
   const { data: productosFiltrados } = useProductos(filtroCategoria)
   const listaBase = filtroCategoria !== undefined ? productosFiltrados : productos
-  
-  const listaFinal = listaBase?.filter(p => 
+
+  const listaFinal = listaBase?.filter(p =>
     p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const { page, pageItems, totalPages, totalItems, goTo } = usePagination(listaFinal, PAGE_SIZE)
 
   function openCreate() {
     setEditing(null)
@@ -209,7 +238,7 @@ export function ProductosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {listaFinal?.map((p) => (
+              {pageItems.map((p) => (
                 <tr key={p.id} className="premium-table-row group">
                   <td className="px-6 py-4 font-mono text-[10px] text-slate-400 text-center">#{p.id}</td>
                   <td className="px-6 py-4">
@@ -259,6 +288,9 @@ export function ProductosPage() {
             </tbody>
           </table>
         </div>
+        <div className="border-t border-slate-100 dark:border-slate-800 px-4">
+          <Pagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={PAGE_SIZE} onPageChange={goTo} />
+        </div>
       </Card>
 
       <Modal open={modalOpen} title={editing ? 'Editar Producto' : 'Nuevo Producto'} onClose={() => setModalOpen(false)} maxWidth="max-w-3xl">
@@ -278,7 +310,7 @@ export function ProductosPage() {
                   <select required value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: Number(e.target.value) })}
                     className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none">
                     <option value={0} disabled>Seleccionar...</option>
-                    {categorias?.map((c) => (
+                    {categoriasHoja.map((c) => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
@@ -287,9 +319,33 @@ export function ProductosPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Precio ($)</label>
-                <input required type="number" min="0.01" step="0.01" value={form.precio_base}
-                  onChange={(e) => setForm({ ...form, precio_base: e.target.value ? e.target.value.replace(/^0+/, '') : '' })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={form.precio_base}
+                  onChange={(e) => setForm({ ...form, precio_base: e.target.value ? Number(e.target.value) : 0 })}
+                  placeholder="0.00"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                {precioSugerido != null && (
+                  <div className="flex flex-col gap-0.5 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, precio_base: precioSugerido.precio })}
+                      className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:text-primary/80 transition-colors"
+                    >
+                      <Sparkles size={12} />
+                      Precio sugerido: ${precioSugerido.precio.toFixed(2)} (costo + 30%)
+                    </button>
+                    {precioSugerido.sinPrecio > 0 && (
+                      <span className="text-[10px] text-amber-500 ml-4">
+                        {precioSugerido.sinPrecio} ingrediente{precioSugerido.sinPrecio > 1 ? 's' : ''} sin precio de costo
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -356,20 +412,26 @@ export function ProductosPage() {
                 {form.ingredientes.length > 0 && (
                   <div className="space-y-2 mt-4 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                     <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-3">Cantidades requeridas por unidad:</p>
-                    {form.ingredientes.map((ing: any) => (
-                      <div key={ing.id} className="flex items-center justify-between gap-4 bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex-1">{ing.nombre}</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          required
-                          value={ing.cantidad_requerida}
-                          onChange={(e) => updateCantidad(ing.id, Number(e.target.value))}
-                          className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    ))}
+                    {form.ingredientes.map((ing: any) => {
+                      const ingFull = todosIngredientes?.find(i => i.id === ing.id)
+                      const simbolo = ingFull?.unidad_medida?.simbolo || ''
+                      return (
+                        <div key={ing.id} className="flex items-center justify-between gap-4 bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex-1">{ing.nombre}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                            <NumberInput
+                              value={ing.cantidad_requerida}
+                              onChange={(v) => updateCantidad(ing.id, v)}
+                              min={0.01}
+                              step={1}
+                              allowDecimal
+                              required
+                            />
+                            <span className="text-[10px] text-slate-400 font-medium w-5 shrink-0">{simbolo}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
                 

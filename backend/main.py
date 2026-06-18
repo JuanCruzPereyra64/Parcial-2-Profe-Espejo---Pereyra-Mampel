@@ -13,7 +13,7 @@ from backend.core.limiter import limiter
 from backend.core.error_handler import validation_handler, rfc_7807_handler
 from backend.core.config import settings
 from backend.core.ws_manager import ws_manager
-from backend.database import create_db_and_tables
+from backend.database import create_db_and_tables, migrate_db
 from backend.routers import categorias, ingredientes, productos, usuarios, pedidos, direcciones, admin, upload, unidades_medida, stock, pagos, ws, estadisticas
 
 logging.basicConfig(
@@ -42,6 +42,7 @@ class TimingMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     ws_manager.set_loop(asyncio.get_running_loop())
     create_db_and_tables()
+    migrate_db()
     yield
 
 app = FastAPI(title="Parcial UTN — Sistema de Productos", lifespan=lifespan)

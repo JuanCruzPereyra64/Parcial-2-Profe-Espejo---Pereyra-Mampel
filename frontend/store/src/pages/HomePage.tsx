@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { productosApi, categoriasApi } from '../services/api'
+import { productosApi, categoriasApi, ingredientesApi } from '../services/api'
 import { useCartStore } from '../store/useCartStore'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { Skeleton } from '../components/common/Skeleton'
 import { cloudinaryUrl } from '../utils/cloudinary'
-import { ShoppingCart, Search } from 'lucide-react'
+import { ShoppingCart, Search, Leaf } from 'lucide-react'
 
 export function HomePage() {
   const [search, setSearch] = useState('')
   const [categoriaFilter, setCategoriaFilter] = useState<number | null>(null)
+  const [ingredienteFilter, setIngredienteFilter] = useState<number | null>(null)
   const { data: productos, isLoading: isLoadingProd } = useQuery({ queryKey: ['productos'], queryFn: () => productosApi.getAll() })
   const { data: categorias } = useQuery({ queryKey: ['categorias'], queryFn: categoriasApi.getAll })
+  const { data: ingredientes } = useQuery({ queryKey: ['ingredientes'], queryFn: ingredientesApi.getAll })
   const addItem = useCartStore(s => s.addItem)
 
   if (isLoadingProd) return (
@@ -42,6 +44,7 @@ export function HomePage() {
     if (!p.disponible) return false
     if (search && !p.nombre.toLowerCase().includes(search.toLowerCase()) && !p.descripcion?.toLowerCase().includes(search.toLowerCase())) return false
     if (categoriaFilter && !p.categorias?.some(c => c.id === categoriaFilter)) return false
+    if (ingredienteFilter && !p.ingredientes?.some(i => i.id === ingredienteFilter)) return false
     return true
   })
 
@@ -73,6 +76,19 @@ export function HomePage() {
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
+        <div className="relative">
+          <Leaf size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <select
+            value={ingredienteFilter ?? ''}
+            onChange={e => setIngredienteFilter(e.target.value ? Number(e.target.value) : null)}
+            className="pl-9 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-primary/20 text-sm"
+          >
+            <option value="">Todos los ingredientes</option>
+            {ingredientes?.map(i => (
+              <option key={i.id} value={i.id}>{i.nombre}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {filtered?.length === 0 ? (

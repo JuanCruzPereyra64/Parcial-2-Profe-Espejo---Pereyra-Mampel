@@ -3,8 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { pedidosApi } from '../services/api'
 import { Card } from '../components/common/Card'
 import { Skeleton } from '../components/common/Skeleton'
-import { TrendingUp, DollarSign, Clock, LayoutDashboard, Filter } from 'lucide-react'
+import { Pagination } from '../components/common/Pagination'
+import { usePagination } from '../hooks/usePagination'
+import { TrendingUp, DollarSign, Clock, LayoutDashboard, Filter, Search, X } from 'lucide-react'
 import { formatCurrency } from '../utils/format'
+
+const PAGE_SIZE = 10
 
 export function VentasPage() {
   const { data: pedidos, isLoading, isError } = useQuery({
@@ -13,6 +17,7 @@ export function VentasPage() {
   })
 
   const [filtroEstado, setFiltroEstado] = useState<string>('')
+  const [busquedaId, setBusquedaId] = useState('')
 
   // Cálculos de métricas
   const metricas = useMemo(() => {
@@ -37,9 +42,8 @@ export function VentasPage() {
     return { ingresosLiquidos: liquidos, aLiquidar, cantidadVentas: cantEntregados, ticketPromedio }
   }, [pedidos])
 
-  const listaFiltrada = useMemo(() => {
+  const listaFiltrada: import('../types').Pedido[] = useMemo(() => {
     if (!pedidos) return []
-    // Por defecto mostramos todo lo que no sea CANCELADO ni PENDIENTE, a menos que se filtre
     let list = pedidos
     if (filtroEstado === 'A_LIQUIDAR') {
       list = pedidos.filter(p => ['EN_PREP', 'CONFIRMADO'].includes(p.estado_codigo))
@@ -48,9 +52,13 @@ export function VentasPage() {
     } else {
       list = pedidos.filter(p => ['ENTREGADO', 'EN_PREP', 'CONFIRMADO'].includes(p.estado_codigo))
     }
-    // Ordenar por fecha descendente
+    if (busquedaId.trim()) {
+      list = list.filter(p => String(p.id).includes(busquedaId.trim()))
+    }
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [pedidos, filtroEstado])
+  }, [pedidos, filtroEstado, busquedaId])
+
+  const { page, pageItems, totalPages, totalItems, goTo } = usePagination(listaFiltrada, PAGE_SIZE)
 
   const estadoBadge: Record<string, { label: string; className: string }> = {
     PENDIENTE:  { label: 'Pendiente',       className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
@@ -137,20 +145,38 @@ export function VentasPage() {
         </Card>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative min-w-[200px]">
-          <label className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-            <Filter size={18} />
-          </label>
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="w-full pl-11 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-          >
-            <option value="">Ingresos (Entregados y en Preparación)</option>
-            <option value="ENTREGADO">Entregados (Cobrados)</option>
-            <option value="A_LIQUIDAR">A Liquidar (En Preparación)</option>
-          </select>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Búsqueda por ID */}
+          <div className="relative w-full max-w-xs">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="number"
+              min="1"
+              placeholder="Buscar por ID de pedido..."
+              value={busquedaId}
+              onChange={(e) => { setBusquedaId(e.target.value); goTo(1) }}
+              className="w-full pl-9 pr-8 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+            />
+            {busquedaId && (
+              <button onClick={() => { setBusquedaId(''); goTo(1) }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {/* Filtro por estado/tipo */}
+          <div className="relative min-w-[220px]">
+            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <select
+              value={filtroEstado}
+              onChange={(e) => { setFiltroEstado(e.target.value); goTo(1) }}
+              className="w-full pl-9 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+            >
+              <option value="">Ingresos (Entregados y en Preparación)</option>
+              <option value="ENTREGADO">Entregados (Cobrados)</option>
+              <option value="A_LIQUIDAR">A Liquidar (En Preparación)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -168,7 +194,7 @@ export function VentasPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {listaFiltrada.map((p) => (
+              {pageItems.map((p) => (
                 <tr key={p.id} className="premium-table-row">
                   <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">#{p.id}</td>
                   <td className="px-6 py-4">{new Date(p.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</td>
@@ -194,6 +220,9 @@ export function VentasPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 dark:border-slate-800 px-4">
+          <Pagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={PAGE_SIZE} onPageChange={goTo} />
         </div>
       </Card>
     </div>

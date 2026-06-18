@@ -9,6 +9,14 @@ import { Button } from '../components/common/Button'
 import { Skeleton } from '../components/common/Skeleton'
 import { cloudinaryUrl } from '../utils/cloudinary'
 import { Package, RefreshCcw, ShoppingBag } from 'lucide-react'
+
+const ESTADO_LABELS: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  CONFIRMADO: 'Confirmado',
+  EN_PREP: 'En preparación',
+  ENTREGADO: 'Entregado',
+  CANCELADO: 'Cancelado',
+}
 import { useNavigate } from 'react-router-dom'
 
 export function PedidosPage() {
@@ -122,7 +130,7 @@ export function PedidosPage() {
 
               <div className="text-right flex flex-col items-end gap-3 md:w-48 shrink-0">
                 <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  {p.estado_codigo}
+                  {ESTADO_LABELS[p.estado_codigo] ?? p.estado_codigo}
                 </span>
                 <p className="font-display font-bold text-2xl text-primary mb-2">${p.total}</p>
 

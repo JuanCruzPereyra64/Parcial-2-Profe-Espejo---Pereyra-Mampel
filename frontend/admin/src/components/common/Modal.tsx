@@ -7,9 +7,10 @@ interface ModalProps {
   onClose: () => void
   children: React.ReactNode
   maxWidth?: string
+  zIndex?: string
 }
 
-export function Modal({ open, title, onClose, children, maxWidth = "max-w-md" }: ModalProps) {
+export function Modal({ open, title, onClose, children, maxWidth = "max-w-md", zIndex = "z-50" }: ModalProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -17,8 +18,7 @@ export function Modal({ open, title, onClose, children, maxWidth = "max-w-md" }:
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={(e) => e.target === e.currentTarget && onClose()}
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4"
+          className={`fixed inset-0 ${zIndex} bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4`}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -40,7 +40,7 @@ export function Modal({ open, title, onClose, children, maxWidth = "max-w-md" }:
             </div>
 
             {/* Content */}
-            <div className="px-6 pt-6 pb-0 flex flex-col min-h-0 flex-1">
+            <div className="px-6 pt-6 pb-6 flex flex-col min-h-0 flex-1">
               {children}
             </div>
           </motion.div>

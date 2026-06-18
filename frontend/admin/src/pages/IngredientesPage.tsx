@@ -1,11 +1,20 @@
 import { useState, useMemo } from 'react'
-import { Plus, Edit2, Trash2, Leaf, Settings2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Leaf, Settings2, Search, X } from 'lucide-react'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { Card } from '../components/common/Card'
+import { Pagination } from '../components/common/Pagination'
+import { NumberInput } from '../components/common/NumberInput'
 import { useIngredientes, useCreateIngrediente, useUpdateIngrediente, useDeleteIngrediente } from '../hooks/useIngredientes'
 import { useUnidadesMedida, useCreateUnidadMedida, useDeleteUnidadMedida } from '../hooks/useUnidadesMedida'
+import { usePagination } from '../hooks/usePagination'
 import type { Ingrediente, IngredienteCreate } from '../types'
+
+const FILTROS_RAPIDOS = [
+  { valor: '', label: 'Todos' },
+  { valor: 'alergeno', label: 'Alérgenos' },
+  { valor: 'stock_bajo', label: 'Stock bajo' },
+]
 
 function UnidadesMedidaManagerModal({ open, onClose }: { open: boolean, onClose: () => void }) {
   const { data: unidades, isLoading } = useUnidadesMedida()
@@ -32,7 +41,7 @@ function UnidadesMedidaManagerModal({ open, onClose }: { open: boolean, onClose:
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Gestionar Unidades de Medida" maxWidth="max-w-md">
+    <Modal open={open} onClose={onClose} title="Gestionar Unidades de Medida" maxWidth="max-w-md" zIndex="z-[60]">
       <div className="space-y-6">
         <form onSubmit={handleCreate} className="flex gap-2">
           <input
@@ -73,13 +82,29 @@ function UnidadesMedidaManagerModal({ open, onClose }: { open: boolean, onClose:
   )
 }
 
+const PAGE_SIZE = 10
+
 export function IngredientesPage() {
   const { data: ingredientes, isLoading, isError } = useIngredientes()
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroRapido, setFiltroRapido] = useState('')
 
-  const ingredientesOrdenados = useMemo(() => {
+  const listaFiltrada = useMemo(() => {
     if (!ingredientes) return []
-    return [...ingredientes].sort((a, b) => (a.stock_actual || 0) - (b.stock_actual || 0))
-  }, [ingredientes])
+    let lista = [...ingredientes].sort((a, b) => (a.stock_actual || 0) - (b.stock_actual || 0))
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase()
+      lista = lista.filter(i => i.nombre.toLowerCase().includes(q))
+    }
+    if (filtroRapido === 'alergeno') lista = lista.filter(i => i.es_alergeno)
+    if (filtroRapido === 'stock_bajo') lista = lista.filter(i => (i.stock_actual || 0) <= (i.stock_minimo || 0))
+    return lista
+  }, [ingredientes, busqueda, filtroRapido])
+
+  const { page, pageItems, totalPages, totalItems, goTo } = usePagination(listaFiltrada, PAGE_SIZE)
+
+  function handleBusqueda(val: string) { setBusqueda(val); goTo(1) }
+  function handleFiltroRapido(val: string) { setFiltroRapido(val); goTo(1) }
 
   const createMutation = useCreateIngrediente()
   const updateMutation = useUpdateIngrediente()
@@ -90,17 +115,17 @@ export function IngredientesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
   const [editing, setEditing] = useState<Ingrediente | null>(null)
-  const [form, setForm] = useState<IngredienteCreate>({ nombre: '', unidad_medida_id: 0, es_alergeno: false, stock_actual: 0, stock_minimo: 0 })
+  const [form, setForm] = useState<IngredienteCreate>({ nombre: '', unidad_medida_id: 0, es_alergeno: false, stock_actual: 0, stock_minimo: 0, precio_costo: null })
 
   function openCreate() {
     setEditing(null)
-    setForm({ nombre: '', unidad_medida_id: unidades?.[0]?.id || 0, es_alergeno: false, stock_actual: 0, stock_minimo: 0 })
+    setForm({ nombre: '', unidad_medida_id: unidades?.[0]?.id || 0, es_alergeno: false, stock_actual: 0, stock_minimo: 0, precio_costo: null })
     setModalOpen(true)
   }
 
   function openEdit(ing: Ingrediente) {
     setEditing(ing)
-    setForm({ nombre: ing.nombre, unidad_medida_id: ing.unidad_medida_id || 0, es_alergeno: ing.es_alergeno, stock_actual: ing.stock_actual || 0, stock_minimo: ing.stock_minimo || 0 })
+    setForm({ nombre: ing.nombre, unidad_medida_id: ing.unidad_medida_id || 0, es_alergeno: ing.es_alergeno, stock_actual: ing.stock_actual || 0, stock_minimo: ing.stock_minimo || 0, precio_costo: ing.precio_costo ?? null })
     setModalOpen(true)
   }
 
@@ -145,6 +170,44 @@ export function IngredientesPage() {
         </div>
       </div>
 
+      {/* Filtros */}
+      <div className="flex flex-col gap-4">
+        <div className="relative w-full max-w-xs">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por denominación..."
+            value={busqueda}
+            onChange={(e) => handleBusqueda(e.target.value)}
+            className="w-full pl-9 pr-8 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+          {busqueda && (
+            <button onClick={() => handleBusqueda('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {FILTROS_RAPIDOS.map(f => (
+            <button
+              key={f.valor}
+              onClick={() => handleFiltroRapido(f.valor)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filtroRapido === f.valor
+                  ? f.valor === 'alergeno'
+                    ? 'bg-red-500 text-white'
+                    : f.valor === 'stock_bajo'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Card noPadding className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -153,13 +216,13 @@ export function IngredientesPage() {
                 <th className="premium-table-header w-16">ID</th>
                 <th className="premium-table-header">Nombre</th>
                 <th className="premium-table-header">Alérgeno</th>
-                <th className="premium-table-header text-right">Stock</th>
-                <th className="premium-table-header">Unidad de Medida</th>
+                <th className="premium-table-header text-right">Stock actual / mín.</th>
+                <th className="premium-table-header text-right">Precio Costo</th>
                 <th className="premium-table-header text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {ingredientesOrdenados.map((ing) => (
+              {pageItems.map((ing) => (
                 <tr key={ing.id} className="premium-table-row">
                   <td className="px-6 py-4 font-mono text-xs text-slate-400">#{ing.id}</td>
                   <td className="px-6 py-4">
@@ -177,17 +240,24 @@ export function IngredientesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end gap-0.5">
                       <span className={`font-semibold ${ing.stock_actual <= ing.stock_minimo ? 'text-red-500' : 'text-slate-900 dark:text-slate-200'}`}>
                         {ing.stock_actual}
+                        <span className="ml-1 text-xs font-normal text-slate-400">{ing.unidad_medida?.simbolo || ''}</span>
                       </span>
-                      <span className="text-[10px] text-slate-500">Mín: {ing.stock_minimo}</span>
+                      <span className="text-[10px] text-slate-500">
+                        Mín: {ing.stock_minimo} {ing.unidad_medida?.simbolo || ''}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-                      {ing.unidad_medida?.nombre || '-'}
-                    </span>
+                  <td className="px-6 py-4 text-right">
+                    {ing.precio_costo != null ? (
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        ${Number(ing.precio_costo).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
@@ -197,19 +267,24 @@ export function IngredientesPage() {
                   </td>
                 </tr>
               ))}
-              {ingredientes?.length === 0 && (
+              {listaFiltrada.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Leaf size={48} className="text-slate-200 dark:text-slate-700" />
-                      <p className="text-slate-500 dark:text-slate-400 font-medium">La despensa está vacía.</p>
-                      <Button variant="ghost" size="sm" onClick={openCreate}>Abastecer ahora</Button>
+                      <p className="text-slate-500 dark:text-slate-400 font-medium">
+                        {ingredientes?.length === 0 ? 'La despensa está vacía.' : 'No hay ingredientes que coincidan con los filtros.'}
+                      </p>
+                      {ingredientes?.length === 0 && <Button variant="ghost" size="sm" onClick={openCreate}>Abastecer ahora</Button>}
                     </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 dark:border-slate-800 px-4">
+          <Pagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={PAGE_SIZE} onPageChange={goTo} />
         </div>
       </Card>
 
@@ -218,92 +293,93 @@ export function IngredientesPage() {
         title={editing ? 'Editar Ingrediente' : 'Nuevo Ingrediente'}
         onClose={() => setModalOpen(false)}
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="space-y-4 pb-4">
+          <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Nombre</label>
             <input
               required
               placeholder="Ej: Harina 000, Sal, Tomate..."
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
             />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between ml-1">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Unidad de Medida</label>
-              <button type="button" onClick={() => setManagerOpen(true)} className="text-xs font-semibold text-accent hover:text-accent/80 flex items-center gap-1 transition-colors">
-                <Settings2 size={12} /> Gestionar
-              </button>
-            </div>
-            <select
-              required
-              value={form.unidad_medida_id || ''}
-              onChange={(e) => setForm({ ...form, unidad_medida_id: Number(e.target.value) })}
-              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all appearance-none cursor-pointer"
-            >
-              <option value="" disabled>Seleccioná una unidad...</option>
-              {unidades?.map((u) => (
-                <option key={u.id} value={u.id}>{u.nombre}</option>
-              ))}
-            </select>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Stock Actual</label>
-              <input
-                type="number"
-                step="0.01"
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Unidad</label>
+                <button type="button" onClick={() => setManagerOpen(true)} className="text-xs font-semibold text-accent hover:text-accent/80 flex items-center gap-1 transition-colors">
+                  <Settings2 size={12} /> Gestionar
+                </button>
+              </div>
+              <select
                 required
-                value={form.stock_actual}
-                onChange={(e) => setForm({ ...form, stock_actual: Number(e.target.value) })}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
-              />
+                value={form.unidad_medida_id || ''}
+                onChange={(e) => setForm({ ...form, unidad_medida_id: Number(e.target.value) })}
+                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all appearance-none cursor-pointer"
+              >
+                <option value="" disabled>Seleccioná...</option>
+                {unidades?.map((u) => (
+                  <option key={u.id} value={u.id}>{u.nombre}</option>
+                ))}
+              </select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Stock Mínimo</label>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                Precio de Costo <span className="text-slate-400 font-normal text-xs">(opcional)</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
-                required
-                value={form.stock_minimo}
-                onChange={(e) => setForm({ ...form, stock_minimo: Number(e.target.value) })}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+                min="0"
+                value={form.precio_costo ?? ''}
+                onChange={(e) => setForm({ ...form, precio_costo: e.target.value ? Number(e.target.value) : null })}
+                placeholder="0.00"
+                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
 
-          <label className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-accent/50 transition-colors">
-            <div className="relative flex items-center">
-              <input
-                type="checkbox"
-                checked={form.es_alergeno}
-                onChange={(e) => setForm({ ...form, es_alergeno: e.target.checked })}
-                className="peer sr-only"
-              />
-              <div className="w-6 h-6 rounded-md border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 peer-checked:bg-red-500 peer-checked:border-red-500 transition-all flex items-center justify-center">
-                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+          {(() => {
+            const simbolo = unidades?.find(u => u.id === form.unidad_medida_id)?.simbolo || ''
+            return (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                    Stock Actual {simbolo && <span className="text-slate-400 font-normal">({simbolo})</span>}
+                  </label>
+                  <NumberInput value={form.stock_actual} onChange={(v) => setForm({ ...form, stock_actual: v })} min={0} step={1} required />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                    Stock Mínimo {simbolo && <span className="text-slate-400 font-normal">({simbolo})</span>}
+                  </label>
+                  <NumberInput value={form.stock_minimo} onChange={(v) => setForm({ ...form, stock_minimo: v })} min={0} step={1} required />
+                </div>
+              </div>
+            )
+          })()}
+
+          <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-accent/50 transition-colors">
+            <div className="relative flex items-center shrink-0">
+              <input type="checkbox" checked={form.es_alergeno} onChange={(e) => setForm({ ...form, es_alergeno: e.target.checked })} className="peer sr-only" />
+              <div className="w-5 h-5 rounded-md border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 peer-checked:bg-red-500 peer-checked:border-red-500 transition-all flex items-center justify-center">
+                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Es un alérgeno</p>
-              <p className="text-xs text-slate-500">Marcar si contiene gluten, lácteos, nueces, etc.</p>
+              <p className="text-xs text-slate-500">Gluten, lácteos, nueces, etc.</p>
             </div>
           </label>
-          
-          <div className="pt-2 pb-4">
-            <Button
-              type="submit"
-              variant="accent"
-              className="w-full py-4 text-base"
-              isLoading={createMutation.isPending || updateMutation.isPending}
-            >
-              {editing ? 'Actualizar Ingrediente' : 'Cargar Ingrediente'}
-            </Button>
-          </div>
+
+          <Button type="submit" variant="accent" className="w-full py-3 text-base" isLoading={createMutation.isPending || updateMutation.isPending}>
+            {editing ? 'Actualizar Ingrediente' : 'Cargar Ingrediente'}
+          </Button>
         </form>
       </Modal>
       <UnidadesMedidaManagerModal open={managerOpen} onClose={() => setManagerOpen(false)} />

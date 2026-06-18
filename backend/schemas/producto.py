@@ -58,7 +58,7 @@ class ProductoIngredienteRead(SQLModel):
 class ProductoRead(SQLModel):
     id: int
     nombre: str
-    precio_base: float
+    precio_base: Decimal
     descripcion: Optional[str] = None
     stock_cantidad: int
     disponible: bool

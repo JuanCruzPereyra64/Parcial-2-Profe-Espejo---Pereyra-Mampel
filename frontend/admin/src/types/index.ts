@@ -56,6 +56,7 @@ export interface Ingrediente {
   es_alergeno: boolean
   stock_actual: number
   stock_minimo: number
+  precio_costo?: number | null
 }
 
 export interface Producto {
@@ -81,6 +82,7 @@ export interface IngredienteCreate {
   es_alergeno: boolean
   stock_actual: number
   stock_minimo: number
+  precio_costo?: number | null
 }
 
 export interface ProductoIngredienteCreate {

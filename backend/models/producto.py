@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 from sqlmodel import Field, Relationship, SQLModel, Column, String, BigInteger, Text, Numeric, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy import CheckConstraint
@@ -34,7 +35,7 @@ class Producto(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(sa_column=Column(String(150), nullable=False))
     descripcion: Optional[str] = Field(default=None, sa_column=Column(Text))
-    precio_base: float = Field(sa_column=Column(Numeric(10, 2), nullable=False))
+    precio_base: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     imagenes_url: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     unidad_venta_id: Optional[int] = Field(default=None, foreign_key="unidades_medida.id")
     tiempo_prep_min: Optional[int] = Field(default=None, sa_column=Column(BigInteger))

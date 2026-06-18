@@ -10,9 +10,9 @@ const RECONNECT_DELAY = 3000
 const PING_INTERVAL = 25000
 
 const ESTADO_LABELS: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
   CONFIRMADO: 'Confirmado',
-  PREPARANDO: 'En preparación',
-  ENVIADO: 'Enviado',
+  EN_PREP: 'En preparación',
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
 }
