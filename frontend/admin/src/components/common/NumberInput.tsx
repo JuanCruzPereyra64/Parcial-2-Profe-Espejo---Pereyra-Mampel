@@ -67,7 +67,7 @@ export function NumberInput({
         required={required}
         disabled={disabled}
         placeholder={placeholder}
-        step={step}
+        step={allowDecimal ? 'any' : step}
         min={min}
         max={max}
         className="w-16 h-full text-center text-sm font-medium bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

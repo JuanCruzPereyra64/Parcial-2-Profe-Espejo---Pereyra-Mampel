@@ -17,6 +17,14 @@ const ESTADO_LABELS: Record<string, string> = {
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
 }
+
+const ESTADO_COLORS: Record<string, string> = {
+  PENDIENTE: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+  CONFIRMADO: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  EN_PREP: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+  ENTREGADO: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+  CANCELADO: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+}
 import { useNavigate } from 'react-router-dom'
 
 export function PedidosPage() {
@@ -129,7 +137,7 @@ export function PedidosPage() {
               </div>
 
               <div className="text-right flex flex-col items-end gap-3 md:w-48 shrink-0">
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${ESTADO_COLORS[p.estado_codigo] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
                   {ESTADO_LABELS[p.estado_codigo] ?? p.estado_codigo}
                 </span>
                 <p className="font-display font-bold text-2xl text-primary mb-2">${p.total}</p>

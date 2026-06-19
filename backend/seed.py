@@ -457,47 +457,28 @@ def run_seed():
                 prod.stock_cantidad = p_data["stock"]
             s.flush()
 
-            # Sincronizar categoría
+            # Sincronizar categoría — delete + re-insert (categoria_id es parte del PK compuesto)
             cat = C[p_data["categoria"]]
-            cat_existente = s.exec(
-                select(ProductoCategoria).where(ProductoCategoria.producto_id == prod.id)
-            ).first()
-            if not cat_existente:
-                s.add(ProductoCategoria(producto_id=prod.id, categoria_id=cat.id, es_principal=True))
-            elif cat_existente.categoria_id != cat.id:
-                cat_existente.categoria_id = cat.id
+            for vieja in s.exec(select(ProductoCategoria).where(ProductoCategoria.producto_id == prod.id)).all():
+                s.delete(vieja)
+            s.flush()
+            s.add(ProductoCategoria(producto_id=prod.id, categoria_id=cat.id, es_principal=True))
             s.flush()
 
-            # Sincronizar ingredientes (para productos nuevos y existentes)
-            if p_data["ings"]:
-                existentes = s.exec(
-                    select(ProductoIngrediente).where(ProductoIngrediente.producto_id == prod.id)
-                ).all()
-                ids_existentes = {pi.ingrediente_id for pi in existentes}
-                ids_seed = {I[nombre].id for nombre, _, _ in p_data["ings"]}
-
-                # Eliminar los que ya no van
-                for pi in existentes:
-                    if pi.ingrediente_id not in ids_seed:
-                        s.delete(pi)
-
-                # Agregar o actualizar
-                for ing_nombre, cantidad, um_id in p_data["ings"]:
-                    ing = I[ing_nombre]
-                    pi = next((x for x in existentes if x.ingrediente_id == ing.id), None)
-                    if pi:
-                        pi.cantidad = cantidad
-                        pi.unidad_medida_id = um_id
-                    else:
-                        s.add(ProductoIngrediente(
-                            producto_id=prod.id,
-                            ingrediente_id=ing.id,
-                            cantidad=cantidad,
-                            unidad_medida_id=um_id,
-                            es_removible=True,
-                            es_opcional=False,
-                        ))
-                s.flush()
+            # Sincronizar ingredientes — delete + re-insert
+            for viejo in s.exec(select(ProductoIngrediente).where(ProductoIngrediente.producto_id == prod.id)).all():
+                s.delete(viejo)
+            s.flush()
+            for ing_nombre, cantidad, um_id in p_data["ings"]:
+                s.add(ProductoIngrediente(
+                    producto_id=prod.id,
+                    ingrediente_id=I[ing_nombre].id,
+                    cantidad=cantidad,
+                    unidad_medida_id=um_id,
+                    es_removible=True,
+                    es_opcional=False,
+                ))
+            s.flush()
 
         print("\nSeed completo finalizado.")
         print("  Usuarios creados:")

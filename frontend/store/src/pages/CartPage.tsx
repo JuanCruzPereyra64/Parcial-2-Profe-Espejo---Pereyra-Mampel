@@ -26,6 +26,7 @@ export function CartPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   const [formaPago, setFormaPago] = useState('EFECTIVO')
   const [paymentPedido, setPaymentPedido] = useState<{ id: number; total: number } | null>(null)
+  const [redirectingToMP, setRedirectingToMP] = useState(false)
 
   async function openCheckout() {
     setCheckoutOpen(true)
@@ -59,6 +60,7 @@ export function CartPage() {
         const user = await authApi.me()
         const localBase = `http://localhost:${window.location.port || '5173'}`
         const pref = await pagosApi.crearPreferencia({ pedido_id: pedido.id, email: user.email, frontend_url: localBase })
+        setRedirectingToMP(true)
         clearCart()
         window.location.href = pref.sandbox_init_point
         return
@@ -81,7 +83,7 @@ export function CartPage() {
     navigate('/mis-pedidos')
   }
 
-  if (items.length === 0) return (
+  if (items.length === 0 && !redirectingToMP) return (
     <div className="flex flex-col items-center justify-center p-20 text-center">
       <ShoppingBag size={64} className="text-slate-300 mb-6" />
       <h2 className="text-2xl font-bold font-display">Tu carrito está vacío</h2>

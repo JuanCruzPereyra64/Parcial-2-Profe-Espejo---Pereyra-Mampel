@@ -44,8 +44,9 @@ def create(uow: UnitOfWork, data: ProductoCreate) -> Producto:
 
     # Unir ingredientes
     for ing in data.ingredientes:
-        link_ing = ProductoIngrediente(producto_id=producto.id, ingrediente_id=ing.id, cantidad=ing.cantidad)
-        uow.session.add(link_ing)
+        ingrediente = ingrediente_service.get_by_id(uow, ing.id)
+        um_id = ing.unidad_medida_id or ingrediente.unidad_medida_id
+        uow.session.add(ProductoIngrediente(producto_id=producto.id, ingrediente_id=ing.id, cantidad=ing.cantidad, unidad_medida_id=um_id))
     
     uow.session.flush()
     return get_by_id(uow, producto.id)
@@ -55,24 +56,21 @@ def update(uow: UnitOfWork, producto_id: int, data: ProductoUpdate) -> Producto:
     producto = get_by_id(uow, producto_id)
     
     if data.categoria_ids is not None:
-        links_cat = uow.session.exec(select(ProductoCategoria).where(ProductoCategoria.producto_id == producto_id)).all()
-        for link in links_cat:
+        for link in uow.session.exec(select(ProductoCategoria).where(ProductoCategoria.producto_id == producto_id)).all():
             uow.session.delete(link)
-        
+        uow.session.flush()
         for cat_id in data.categoria_ids:
             categoria_service.get_by_id(uow, cat_id)
-            link_cat = ProductoCategoria(producto_id=producto.id, categoria_id=cat_id)
-            uow.session.add(link_cat)
-    
+            uow.session.add(ProductoCategoria(producto_id=producto.id, categoria_id=cat_id))
+
     if data.ingredientes is not None:
-        links_ing = uow.session.exec(select(ProductoIngrediente).where(ProductoIngrediente.producto_id == producto_id)).all()
-        for link in links_ing:
+        for link in uow.session.exec(select(ProductoIngrediente).where(ProductoIngrediente.producto_id == producto_id)).all():
             uow.session.delete(link)
-        
+        uow.session.flush()
         for ing in data.ingredientes:
-            ingrediente_service.get_by_id(uow, ing.id)
-            link = ProductoIngrediente(producto_id=producto_id, ingrediente_id=ing.id, cantidad=ing.cantidad)
-            uow.session.add(link)
+            ingrediente = ingrediente_service.get_by_id(uow, ing.id)
+            um_id = ing.unidad_medida_id or ingrediente.unidad_medida_id
+            uow.session.add(ProductoIngrediente(producto_id=producto_id, ingrediente_id=ing.id, cantidad=ing.cantidad, unidad_medida_id=um_id))
 
     for key, value in data.model_dump(exclude_unset=True, exclude={"ingredientes", "categoria_ids"}).items():
         setattr(producto, key, value)

@@ -51,10 +51,10 @@ def crear_pedido(uow: UnitOfWork, usuario_id: int, data: PedidoCreate) -> Pedido
             ing = uow.session.get(Ingrediente, link.ingrediente_id)
             if ing:
                 cantidad_a_consumir = link.cantidad * det_data.cantidad
-                if ing.stock_cantidad < int(cantidad_a_consumir):
+                if ing.stock_actual < int(cantidad_a_consumir):
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Stock insuficiente de '{ing.nombre}' para preparar '{producto.nombre}'. Requerido: {int(cantidad_a_consumir)}, Disponible: {ing.stock_cantidad}"
+                        detail=f"Stock insuficiente de '{ing.nombre}' para preparar '{producto.nombre}'. Requerido: {int(cantidad_a_consumir)}, Disponible: {ing.stock_actual}"
                     )
         
     costo_envio = Decimal('50.00')  # Hardcoded. Podría provenir de config o logística.
@@ -137,12 +137,12 @@ def transicionar_estado(uow: UnitOfWork, pedido_id: int, nuevo_estado_codigo: st
                 ing = uow.session.get(Ingrediente, link.ingrediente_id)
                 if ing:
                     cantidad_a_consumir = link.cantidad * detalle.cantidad
-                    if ing.stock_cantidad < int(cantidad_a_consumir):
+                    if ing.stock_actual < int(cantidad_a_consumir):
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Stock insuficiente de '{ing.nombre}'. Requerido: {int(cantidad_a_consumir)}, Disponible: {ing.stock_cantidad}"
+                            detail=f"Stock insuficiente de '{ing.nombre}'. Requerido: {int(cantidad_a_consumir)}, Disponible: {ing.stock_actual}"
                         )
-                    ing.stock_cantidad -= int(cantidad_a_consumir)
+                    ing.stock_actual -= int(cantidad_a_consumir)
                     uow.session.add(ing)
                     movimiento_stock_service.registrar_movimiento(
                         uow,
@@ -162,7 +162,7 @@ def transicionar_estado(uow: UnitOfWork, pedido_id: int, nuevo_estado_codigo: st
                 ing = uow.session.get(Ingrediente, link.ingrediente_id)
                 if ing:
                     cantidad_a_devolver = link.cantidad * detalle.cantidad
-                    ing.stock_cantidad += int(cantidad_a_devolver)
+                    ing.stock_actual += int(cantidad_a_devolver)
                     uow.session.add(ing)
                     movimiento_stock_service.registrar_movimiento(
                         uow,

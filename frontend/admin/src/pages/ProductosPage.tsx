@@ -142,7 +142,7 @@ export function ProductosPage() {
       precio_base: Number(form.precio_base),
       descripcion: form.descripcion,
       categoria_ids: [form.categoria_id],
-      ingredientes: form.ingredientes.map((i: any) => ({ id: i.id, cantidad_requerida: Number(i.cantidad_requerida) })),
+      ingredientes: form.ingredientes.map((i: any) => ({ id: i.id, cantidad: Number(i.cantidad_requerida) })),
       imagenes_url: form.imagenes_url.filter((u: string) => u.trim() !== '')
     }
 
